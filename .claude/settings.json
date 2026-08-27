@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git restore:*)",
+      "Bash(git rm --cached:*)",
+      "Bash(python -m jobcollator.collect:*)",
+      "Bash(python -m jobcollator.*)",
+      "Bash(python -m pip install -r requirements.txt:*)"
+    ]
+  }
+}
