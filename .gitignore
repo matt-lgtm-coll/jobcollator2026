@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+data/jobs.db
+data/report.html
+data/last_run_summary.json
+.artifact_url
+.claude/scheduled_tasks.lock

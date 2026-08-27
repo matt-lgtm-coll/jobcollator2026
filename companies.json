@@ -1,0 +1,90 @@
+{
+  "_comment": "One entry per employer. 'engine' is optional — omit it and run `python -m jobcollator.detect <url>` to find out, or just leave it out and collect.py will try to auto-detect on first run and remember the result here. 'location_filter' is applied server-side by the engine (a search param or facet lookup) to cut down request volume, not just the result set — set to null/omit to track every location.",
+  "companies": [
+    {
+      "name": "Novo Nordisk",
+      "start_url": "https://careers.novonordisk.com/search/",
+      "engine": "sf_j2w",
+      "location_filter": "Denmark"
+    },
+    {
+      "name": "Lundbeck",
+      "start_url": "https://jobs.lundbeck/search/",
+      "engine": "sf_j2w",
+      "location_filter": "Denmark"
+    },
+    {
+      "name": "LEO Pharma",
+      "start_url": "https://jobs.leo-pharma.com/search/",
+      "engine": "sf_j2w",
+      "location_filter": "Denmark"
+    },
+    {
+      "name": "IQVIA",
+      "start_url": "https://iqvia.wd1.myworkdayjobs.com/IQVIA",
+      "engine": "workday",
+      "location_filter": "Denmark"
+    },
+    {
+      "name": "Parexel",
+      "start_url": "https://parexel.wd1.myworkdayjobs.com/Parexel_External_Careers",
+      "engine": "workday",
+      "location_filter": "Denmark"
+    },
+    {
+      "name": "Thermo Fisher Scientific (incl. PPD)",
+      "start_url": "https://thermofisher.wd5.myworkdayjobs.com/ThermoFisherCareers",
+      "engine": "workday",
+      "location_filter": "Denmark"
+    },
+    {
+      "name": "Ferring Pharmaceuticals",
+      "start_url": "https://ferring.wd3.myworkdayjobs.com/Ferring",
+      "engine": "workday",
+      "location_filter": "Denmark"
+    },
+    {
+      "name": "Genmab",
+      "start_url": "https://genmab.wd3.myworkdayjobs.com/Genmab_Careers_Site",
+      "engine": "workday",
+      "location_filter": "Denmark"
+    },
+    {
+      "name": "Zealand Pharma",
+      "start_url": "https://zealandpharma.wd3.myworkdayjobs.com/External",
+      "engine": "workday",
+      "location_filter": "Denmark"
+    },
+    {
+      "name": "Bavarian Nordic",
+      "start_url": "https://bavariannordic.wd103.myworkdayjobs.com/BavarianNordic",
+      "engine": "workday",
+      "location_filter": "Denmark"
+    },
+    {
+      "name": "Ascendis Pharma",
+      "start_url": "https://apply.workable.com/ascendis-pharma/",
+      "engine": "workable",
+      "location_filter": "Denmark"
+    },
+    {
+      "name": "ICON plc",
+      "start_url": "https://careers.iconplc.com/jobs",
+      "engine": "attrax",
+      "location_filter": "Denmark"
+    },
+    {
+      "name": "Medpace",
+      "start_url": "https://careers.medpace.com/jobs",
+      "engine": "jibe",
+      "location_filter": "Denmark"
+    }
+  ],
+  "_unsupported": [
+    {
+      "name": "ALK-Abelló",
+      "start_url": "https://alkabello.easycruit.com/",
+      "reason": "EasyCruit career site sits behind an AWS WAF JS challenge (x-amzn-waf-action: challenge on every plain request) — not scrapable without a real browser, which this tool intentionally doesn't do. Revisit if ALK moves ATS platforms."
+    }
+  ]
+}
