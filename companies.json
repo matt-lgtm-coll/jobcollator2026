@@ -84,6 +84,12 @@
       "start_url": "https://career.hitalento.com/hemab/",
       "engine": "hitalento",
       "location_filter": "Denmark"
+    },
+    {
+      "name": "Pharmacosmos",
+      "start_url": "https://pharmacosmos.com/career/job-openings/",
+      "engine": "pharmacosmos",
+      "location_filter": "Denmark"
     }
   ],
   "_unsupported": [

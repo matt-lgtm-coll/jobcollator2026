@@ -1,4 +1,4 @@
-from . import attrax, hitalento, jibe, sf_j2w, workable, workday
+from . import attrax, hitalento, jibe, pharmacosmos, sf_j2w, workable, workday
 
 ENGINES = {
     "sf_j2w": sf_j2w,
@@ -7,4 +7,5 @@ ENGINES = {
     "jibe": jibe,
     "workable": workable,
     "hitalento": hitalento,
+    "pharmacosmos": pharmacosmos,
 }
