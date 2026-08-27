@@ -49,6 +49,8 @@ def detect(url: str, session=None):
                 return "attrax", url
             if "jibecdn.com" in lower or ".icims.com" in lower:
                 return "jibe", url
+            if "hitalento-career-theme" in lower:
+                return "hitalento", url
     except requests.RequestException:
         pass
 

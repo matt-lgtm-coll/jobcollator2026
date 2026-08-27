@@ -78,6 +78,12 @@
       "start_url": "https://careers.medpace.com/jobs",
       "engine": "jibe",
       "location_filter": "Denmark"
+    },
+    {
+      "name": "Hemab",
+      "start_url": "https://career.hitalento.com/hemab/",
+      "engine": "hitalento",
+      "location_filter": "Denmark"
     }
   ],
   "_unsupported": [
