@@ -2,10 +2,10 @@ name: Collect job postings
 
 on:
   schedule:
-    # 06:06 UTC ≈ 08:06 Europe/Copenhagen in summer (CEST, UTC+2),
-    # ≈ 07:06 local in winter (CET, UTC+1) — GitHub Actions cron is
+    # 10:00 UTC ≈ noon Europe/Copenhagen in summer (CEST, UTC+2),
+    # ≈ 11:00 local in winter (CET, UTC+1) — GitHub Actions cron is
     # UTC-only, so the local time drifts ~1h across the DST changeovers.
-    - cron: "6 6 * * *"
+    - cron: "0 10 * * *"
   workflow_dispatch: {}
 
 permissions:
