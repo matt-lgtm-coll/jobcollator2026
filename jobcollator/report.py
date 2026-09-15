@@ -4,7 +4,7 @@ import json
 from datetime import date, datetime
 from pathlib import Path
 
-from . import db
+from . import db, tagging
 
 DEFAULT_OUT = Path(__file__).resolve().parent.parent / "data" / "report.html"
 
@@ -16,21 +16,47 @@ def _latest_run_date(conn) -> str:
 
 
 def _today_failures(conn, run_date: str):
+    # collect.py can run (or be re-run) several times on the same run_date —
+    # only show a company here if its single most recent run *overall*
+    # today was the failure, not merely its most recent failure. Filtering
+    # on status='error' before picking MAX(id) (an earlier, buggier version
+    # of this query) got that wrong: a company that failed once and then
+    # succeeded later the same day kept showing in the banner using the
+    # stale error detail, because nothing ever checked whether a later,
+    # successful run had superseded it.
     cur = conn.execute(
-        "SELECT company, detail FROM runs WHERE status='error' AND run_date=? "
-        "ORDER BY id DESC", (run_date,),
+        "SELECT company, detail FROM runs r1 WHERE run_date=? AND status='error' "
+        "AND id = (SELECT MAX(id) FROM runs r2 WHERE r2.company = r1.company AND r2.run_date=?) "
+        "ORDER BY id DESC",
+        (run_date, run_date),
     )
     return cur.fetchall()
 
 
-def generate(conn, out_path: Path = DEFAULT_OUT) -> Path:
+def generate(conn, out_path: Path = DEFAULT_OUT, tracked_companies=None, unsupported=None) -> Path:
+    """tracked_companies: every company name collect.py is configured to check
+    (from companies.json), so one currently at zero postings still shows up
+    as "tracked, just empty" rather than looking indistinguishable from one
+    never checked at all. unsupported: [{"name", "reason"}, ...] for
+    companies deliberately left out (e.g. blocked by bot-detection) — surfaced
+    so that absence reads as a documented decision, not a silent gap."""
     run_date = _latest_run_date(conn)
     jobs = db.active_jobs(conn)
     failures = _today_failures(conn, run_date)
 
-    companies = sorted({j["company"] for j in jobs})
-    new_count = sum(1 for j in jobs if j["first_seen"] == run_date)
+    confirmed_jobs = [j for j in jobs if not j["soft_match"]]
+    soft_jobs = [j for j in jobs if j["soft_match"]]
 
+    companies_with_jobs = {j["company"] for j in jobs}
+    all_companies = sorted(companies_with_jobs | set(tracked_companies or []))
+    zero_result_companies = sorted(set(tracked_companies or []) - companies_with_jobs)
+    # Soft matches (see JobPosting.soft_match) are a hint, not a confirmed
+    # opening, so they're excluded from the headline counts the same way
+    # db.new_since() already excludes them from the "new" list — shown in
+    # the table below with their own badge instead, not folded in here.
+    new_count = sum(1 for j in confirmed_jobs if j["first_seen"] == run_date)
+
+    tags_config = tagging.load_tags()
     payload = [{
         "company": j["company"],
         "title": j["title"],
@@ -38,7 +64,9 @@ def generate(conn, out_path: Path = DEFAULT_OUT) -> Path:
         "category": j["category"] or "—",
         "url": j["url"],
         "posted": j["posted_date"] or "",
-        "isNew": j["first_seen"] == run_date,
+        "isNew": (not j["soft_match"]) and j["first_seen"] == run_date,
+        "isSoftMatch": bool(j["soft_match"]),
+        "tags": [t["id"] for t in tagging.match_tags(j["title"], j["category"] or "", tags_config, j["jd_text"] or "")],
     } for j in jobs]
 
     generated_at = datetime.now().strftime("%A %d %b %Y, %H:%M")
@@ -46,11 +74,16 @@ def generate(conn, out_path: Path = DEFAULT_OUT) -> Path:
     html_out = _TEMPLATE.format(
         generated_at=html.escape(generated_at),
         run_date=html.escape(run_date),
-        total_jobs=len(jobs),
+        total_jobs=len(confirmed_jobs),
         new_count=new_count,
-        company_count=len(companies),
+        soft_match_count=len(soft_jobs),
+        tag_filter_html=_render_tag_filter(tags_config),
+        tag_labels_json=json.dumps({t["id"]: t["label"] for t in tags_config}, ensure_ascii=False),
+        tag_badges_json=json.dumps({t["id"]: t.get("badge", t["label"]) for t in tags_config}, ensure_ascii=False),
+        company_count=len(all_companies),
         failures_html=_render_failures(failures),
-        company_options=_render_company_options(companies),
+        coverage_html=_render_coverage(zero_result_companies, unsupported or []),
+        company_options=_render_company_options(all_companies),
         jobs_json=json.dumps(payload, ensure_ascii=False),
     )
 
@@ -81,6 +114,33 @@ def _render_company_options(companies) -> str:
     return "".join(f'<option value="{html.escape(c)}">{html.escape(c)}</option>' for c in companies)
 
 
+def _render_tag_filter(tags_config) -> str:
+    if not tags_config:
+        return ""
+    options = "".join(f'<option value="{html.escape(t["id"])}">{html.escape(t["label"])}</option>' for t in tags_config)
+    return (f'<select id="tagFilter" aria-label="Filter by role tag">'
+            f'<option value="">All roles</option>{options}</select>')
+
+
+def _render_coverage(zero_result_companies, unsupported) -> str:
+    if not zero_result_companies and not unsupported:
+        return ""
+    parts = []
+    if zero_result_companies:
+        pills = "".join(
+            f'<span class="pill-zero">{html.escape(c)} &middot; 0 open</span>'
+            for c in zero_result_companies
+        )
+        parts.append(f'<span class="coverage-group">Tracked, no matches right now: {pills}</span>')
+    if unsupported:
+        pills = "".join(
+            f'<span class="pill-unsupported" title="{html.escape(u.get("reason", ""))}">{html.escape(u["name"])}</span>'
+            for u in unsupported
+        )
+        parts.append(f'<span class="coverage-group">Not tracked: {pills}</span>')
+    return f'<p class="coverage-note">{"".join(parts)}</p>'
+
+
 _TEMPLATE = """<!doctype html>
 <title>Job Collator</title>
 <meta charset="utf-8" />
@@ -101,6 +161,8 @@ _TEMPLATE = """<!doctype html>
     --accent-soft: #e4efee;
     --new: #9a5f1c;
     --new-soft: #fbeedc;
+    --tag: #a23e5a;
+    --tag-soft: #fbe9ef;
     --shadow: 0 1px 2px rgba(20, 24, 30, 0.06), 0 8px 24px -12px rgba(20, 24, 30, 0.12);
     --radius: 10px;
     color-scheme: light;
@@ -118,6 +180,8 @@ _TEMPLATE = """<!doctype html>
       --accent-soft: #1b3a3a;
       --new: #e3a857;
       --new-soft: #3a2c14;
+      --tag: #e8829f;
+      --tag-soft: #3a1f28;
       --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -12px rgba(0, 0, 0, 0.5);
       color-scheme: dark;
     }}
@@ -134,6 +198,8 @@ _TEMPLATE = """<!doctype html>
     --accent-soft: #1b3a3a;
     --new: #e3a857;
     --new-soft: #3a2c14;
+    --tag: #e8829f;
+    --tag-soft: #3a1f28;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -12px rgba(0, 0, 0, 0.5);
     color-scheme: dark;
   }}
@@ -262,20 +328,33 @@ _TEMPLATE = """<!doctype html>
   td.title-cell a:focus-visible {{ outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }}
   td.muted {{ color: var(--text-muted); }}
 
-  .badge-new {{
+  .badge-new, .badge-soft, .badge-tag {{
     display: inline-block;
     font-family: "IBM Plex Mono", monospace;
     font-size: 0.66rem;
     font-weight: 600;
     letter-spacing: 0.04em;
-    color: var(--new);
-    background: var(--new-soft);
-    border: 1px solid color-mix(in srgb, var(--new) 40%, transparent);
     border-radius: 4px;
     padding: 1px 5px;
     margin-left: 7px;
     vertical-align: 1px;
   }}
+  .badge-new {{
+    color: var(--new);
+    background: var(--new-soft);
+    border: 1px solid color-mix(in srgb, var(--new) 40%, transparent);
+  }}
+  .badge-soft {{
+    color: var(--accent-strong);
+    background: var(--accent-soft);
+    border: 1px dashed color-mix(in srgb, var(--accent) 45%, transparent);
+  }}
+  .badge-tag {{
+    color: var(--tag);
+    background: var(--tag-soft);
+    border: 1px solid color-mix(in srgb, var(--tag) 40%, transparent);
+  }}
+  tr.soft-match-row {{ opacity: 0.82; }}
 
   .company-tag {{
     display: inline-flex;
@@ -304,6 +383,34 @@ _TEMPLATE = """<!doctype html>
     white-space: nowrap;
   }}
 
+  .coverage-note {{
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+  }}
+  .coverage-group {{ display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }}
+  .pill-zero, .pill-unsupported {{
+    display: inline-block;
+    font-size: 0.72rem;
+    border-radius: 100px;
+    padding: 1px 8px;
+    white-space: nowrap;
+  }}
+  .pill-zero {{
+    color: var(--text-muted);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+  }}
+  .pill-unsupported {{
+    color: var(--text-muted);
+    background: transparent;
+    border: 1px dashed var(--border);
+    cursor: help;
+  }}
+
   .empty {{ padding: 40px 20px; text-align: center; color: var(--text-muted); }}
 
   footer {{ text-align: center; color: var(--text-muted); font-size: 0.78rem; padding-top: 8px; }}
@@ -326,7 +433,12 @@ _TEMPLATE = """<!doctype html>
     <div class="stat accent"><span class="value mono">{total_jobs}</span><span class="label">Open roles tracked</span></div>
     <div class="stat"><span class="value mono">{new_count}</span><span class="label">New since last run</span></div>
     <div class="stat"><span class="value mono">{company_count}</span><span class="label">Companies</span></div>
+    <div class="stat" title="Not location-tagged as Denmark, but the role title mentions it as an alternative site (e.g. &quot;(DK/US)&quot;) — a hint worth checking, not a confirmed opening.">
+      <span class="value mono">{soft_match_count}</span><span class="label">Title mentions Denmark</span>
+    </div>
   </div>
+
+  {coverage_html}
 
   <div class="toolbar">
     <input type="search" id="search" placeholder="Search title or location&hellip;" aria-label="Search jobs" />
@@ -334,6 +446,7 @@ _TEMPLATE = """<!doctype html>
       <option value="">All companies</option>
       {company_options}
     </select>
+    {tag_filter_html}
     <span class="count" id="resultCount"></span>
   </div>
 
@@ -358,6 +471,8 @@ _TEMPLATE = """<!doctype html>
 
 <script>
   const JOBS = {jobs_json};
+  const TAG_LABELS = {tag_labels_json};
+  const TAG_BADGES = {tag_badges_json};
 
   const DOT_HUES = [178, 206, 26, 265, 340, 92, 12, 232];
   function hashHue(str) {{
@@ -370,11 +485,12 @@ _TEMPLATE = """<!doctype html>
     return `hsl(${{hue}} 55% 45%)`;
   }}
 
-  const state = {{ search: "", company: "", sortKey: "posted", sortDir: "desc" }};
+  const state = {{ search: "", company: "", tag: "", sortKey: "posted", sortDir: "desc" }};
 
   const els = {{
     search: document.getElementById("search"),
     companyFilter: document.getElementById("companyFilter"),
+    tagFilter: document.getElementById("tagFilter"),
     body: document.getElementById("jobsBody"),
     count: document.getElementById("resultCount"),
     empty: document.getElementById("emptyState"),
@@ -389,6 +505,7 @@ _TEMPLATE = """<!doctype html>
     const q = state.search.trim().toLowerCase();
     let rows = JOBS.filter(j => {{
       if (state.company && j.company !== state.company) return false;
+      if (state.tag && !j.tags.includes(state.tag)) return false;
       if (!q) return true;
       return j.title.toLowerCase().includes(q) || j.location.toLowerCase().includes(q);
     }});
@@ -406,11 +523,13 @@ _TEMPLATE = """<!doctype html>
     els.empty.hidden = rows.length !== 0;
 
     els.body.innerHTML = rows.map(j => `
-      <tr>
+      <tr class="${{j.isSoftMatch ? 'soft-match-row' : ''}}">
         <td><span class="company-tag" style="--dot:${{companyDot(j.company)}}">${{escapeHtml(j.company)}}</span></td>
         <td class="title-cell">
           <a href="${{j.url}}" target="_blank" rel="noopener noreferrer">${{escapeHtml(j.title)}}</a>
           ${{j.isNew ? '<span class="badge-new">NEW</span>' : ''}}
+          ${{j.isSoftMatch ? '<span class="badge-soft" title="Not location-tagged as Denmark — the title just mentions it as an alternative site">DK MENTIONED</span>' : ''}}
+          ${{j.tags.map(id => `<span class="badge-tag" title="${{escapeHtml(TAG_LABELS[id] || id)}} — matched a configured keyword in the title/category, a scanning hint not a guarantee">${{escapeHtml((TAG_BADGES[id] || id).toUpperCase())}}</span>`).join("")}}
         </td>
         <td class="muted">${{escapeHtml(j.location)}}</td>
         <td><span class="category-pill">${{escapeHtml(j.category)}}</span></td>
@@ -421,6 +540,7 @@ _TEMPLATE = """<!doctype html>
 
   els.search.addEventListener("input", e => {{ state.search = e.target.value; render(); }});
   els.companyFilter.addEventListener("change", e => {{ state.company = e.target.value; render(); }});
+  if (els.tagFilter) els.tagFilter.addEventListener("change", e => {{ state.tag = e.target.value; render(); }});
   els.headers.forEach(th => {{
     th.addEventListener("click", () => {{
       const key = th.dataset.key;

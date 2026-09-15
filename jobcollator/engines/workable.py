@@ -19,7 +19,7 @@ Job detail pages live at `{origin}/<account>/j/<shortcode>/`.
 """
 from urllib.parse import urlparse
 
-from .base import FetchError, JobPosting
+from .base import FetchError, JobPosting, strip_html
 
 MAX_PAGES = 100  # safety valve: Workable pages ~10 postings at a time
 
@@ -40,6 +40,25 @@ def _matching_country_codes(filters: dict, location_filter: str) -> list[str]:
             if code:
                 codes.add(code)
     return sorted(codes)
+
+
+def fetch_description(session, url: str) -> str:
+    """Workable's job detail page (JobPosting.url) is a JS-rendered shell
+    with no description in its raw HTML — this hits the per-job JSON API
+    its own frontend uses instead (confirmed: `description` /
+    `requirements` / `benefits`, each HTML-formatted)."""
+    parsed = urlparse(url)
+    origin = f"{parsed.scheme}://{parsed.netloc}"
+    segments = [s for s in parsed.path.split("/") if s]
+    if len(segments) < 3 or segments[-2] != "j":
+        raise FetchError(f"unexpected Workable job URL shape: {url}")
+    account, shortcode = segments[0], segments[-1]
+
+    resp = session.get(f"{origin}/api/v1/accounts/{account}/jobs/{shortcode}", timeout=30)
+    resp.raise_for_status()
+    data = resp.json()
+    combined = " ".join(data.get(k, "") or "" for k in ("description", "requirements", "benefits"))
+    return strip_html(combined)
 
 
 def fetch(name: str, start_url: str, session, location_filter: str = None) -> list[JobPosting]:

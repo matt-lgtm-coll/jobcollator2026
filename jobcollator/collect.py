@@ -11,7 +11,7 @@ import time
 from datetime import date, datetime
 from pathlib import Path
 
-from . import db, report
+from . import db, report, tagging
 from .detect import detect
 from .engines import ENGINES
 from .engines.base import FetchError
@@ -26,6 +26,12 @@ def load_companies(path: Path):
     with open(path, encoding="utf-8") as f:
         data = json.load(f)
     return data["companies"]
+
+
+def load_unsupported(path: Path):
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    return data.get("_unsupported", [])
 
 
 def save_companies(path: Path, companies):
@@ -103,7 +109,15 @@ def main(argv=None):
     if companies_dirty:
         save_companies(args.companies, companies)
 
-    out_path = report.generate(conn, args.report)
+    fetched = tagging.backfill_descriptions(conn, session, companies)
+    if fetched:
+        print(f"\nFetched job descriptions for {fetched} posting(s) new to interest-tag matching")
+
+    out_path = report.generate(
+        conn, args.report,
+        tracked_companies=[c["name"] for c in companies],
+        unsupported=load_unsupported(args.companies),
+    )
     print(f"\nReport written to {out_path}")
 
     new_jobs = db.new_since(conn, run_date)

@@ -1,0 +1,17 @@
+{
+  "_comment": "Keyword-based role tags, matched case-insensitively as substrings against each posting's title + category — computed fresh at every report render, not stored anywhere. Add more tags here any time; no code changes needed. 'label' is the full name shown in the toolbar's role filter dropdown; 'badge' is an optional shorter form for the in-table badge (falls back to 'label' if omitted — useful since a long label reads fine in a dropdown option but crowds a table row). Keep keyword lists tight and specific — this is a scanning aid for the dashboard ('roles worth a second look'), not a precise clinical-relevance filter. Avoid bare words that are common outside the target therapeutic area even when they sound specific — e.g. bare 'metabolic' also flags routine drug-metabolism/DMPK roles, bare 'lipid' also flags lipid-nanoparticle (mRNA/gene-therapy delivery) roles — prefer the more specific phrase instead.",
+  "tags": [
+    {
+      "id": "cardiometabolic",
+      "label": "Cardiology & Cardiometabolic",
+      "badge": "Cardio/Metabolic",
+      "keywords": [
+        "cardiology", "cardiologist", "cardiac", "cardiovascular",
+        "heart failure", "coronary", "arrhythmia", "atrial fibrillation",
+        "echocardiogra", "electrophysiology", "atherosclerosis",
+        "cardiometabolic", "metabolic syndrome", "type 2 diabetes",
+        "diabetes", "obesity", "dyslipidemia", "hypertension", "NASH", "MASH"
+      ]
+    }
+  ]
+}

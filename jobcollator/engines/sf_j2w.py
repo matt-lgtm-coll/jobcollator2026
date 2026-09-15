@@ -14,6 +14,7 @@ needed), so this engine just paginates it with `requests` + BeautifulSoup.
 `/services/` is disallowed in robots.txt on these sites, but `/search/` and
 `/job/` are not — this engine only ever touches those two.
 """
+import re
 from datetime import datetime
 from urllib.parse import urljoin, urlparse
 
@@ -22,6 +23,29 @@ from bs4 import BeautifulSoup
 from .base import FetchError, JobPosting
 
 MAX_PAGES = 60  # safety valve: 60 pages, far above any real employer's job count
+
+# Novo Nordisk's instance of this platform spells September "Sept" (4
+# letters — e.g. "1 Sept 2026") instead of the standard 3-letter abbreviation
+# strptime's %b expects, so every September posting silently failed to parse
+# and landed as posted_date=None. Normalize before parsing rather than
+# assuming the site sticks to the standard AP/ISO month abbreviations.
+_NONSTANDARD_MONTH_RE = re.compile(r"\bSept\b")
+
+# For verifying a location_filter actually took effect (see fetch()) and, when
+# it didn't, filtering client-side instead. Location text on this platform is
+# freeform ("Kalundborg, Region Zealand, DK" — no country name at all, just a
+# trailing ISO code) so a plain substring check on the country name isn't
+# enough by itself; extend this as other countries come up.
+_COUNTRY_CODE_HINTS = {"denmark": "dk"}
+
+
+def _location_matches(location_text: str, location_filter: str) -> bool:
+    text = (location_text or "").lower()
+    needle = location_filter.lower()
+    if needle in text:
+        return True
+    code = _COUNTRY_CODE_HINTS.get(needle)
+    return bool(code) and text.rsplit(",", 1)[-1].strip() == code
 
 
 def _search_root(start_url: str) -> str:
@@ -34,19 +58,24 @@ def _parse_date(text: str):
     text = text.strip()
     if not text:
         return None
-    try:
-        return datetime.strptime(text, "%d %b %Y").date().isoformat()
-    except ValueError:
-        return None
+    text = _NONSTANDARD_MONTH_RE.sub("Sep", text)
+    for fmt in ("%d %b %Y", "%d %B %Y"):
+        try:
+            return datetime.strptime(text, fmt).date().isoformat()
+        except ValueError:
+            continue
+    return None
 
 
-def fetch(name: str, start_url: str, session, location_filter: str = None) -> list[JobPosting]:
-    root = _search_root(start_url)
-    params = {"locationsearch": location_filter} if location_filter else {}
+_TOTAL_RESULTS_RE = re.compile(r"of <b>(\d+)</b>")
+
+
+def _fetch_pages(name: str, root: str, session, params: dict) -> list[JobPosting]:
     postings: list[JobPosting] = []
     seen_ids: set[str] = set()
     startrow = 0
     page_size = None  # discovered from the first page; pages differ by site (25/50/100)
+    reported_total = None  # from the page's own "Results X – Y of <total>" label
 
     for _ in range(MAX_PAGES):
         page_params = {**params, "startrow": startrow} if startrow else params
@@ -67,6 +96,10 @@ def fetch(name: str, start_url: str, session, location_filter: str = None) -> li
             break
         if page_size is None:
             page_size = len(rows)
+        if reported_total is None:
+            m = _TOTAL_RESULTS_RE.search(resp.text)
+            if m:
+                reported_total = int(m.group(1))
 
         for row in rows:
             link = row.select_one("td.colTitle a.jobTitle-link")
@@ -93,9 +126,52 @@ def fetch(name: str, start_url: str, session, location_filter: str = None) -> li
                 posted_date=_parse_date(date_el.get_text()) if date_el else None,
             ))
 
-        if len(rows) < page_size:
-            # Short page — this was the last one.
+        startrow += len(rows)
+
+        if reported_total is not None:
+            # Trust the count the page itself reported for "how many pages
+            # exist" over inferring it from row-count parity: confirmed on
+            # Lundbeck that when the *last* page happens to exactly fill a
+            # page (total is a multiple of page_size), asking for "page 2"
+            # anyway got back a mix of stale duplicates and completely
+            # unrelated postings — the site's own pagination breaks down
+            # past the true end when combined with `locationsearch`, so the
+            # fix is to never issue that request in the first place.
+            if startrow >= reported_total:
+                break
+        elif len(rows) < page_size:
+            # No parseable total (unexpected page structure) — fall back to
+            # the row-count heuristic: a short page means this was the last.
             break
-        startrow += page_size
+
+    return postings
+
+
+def fetch(name: str, start_url: str, session, location_filter: str = None) -> list[JobPosting]:
+    root = _search_root(start_url)
+    # Confirmed on Lundbeck: whatever locale this tenant's board defaults to
+    # without an explicit `locale` param doesn't honor `locationsearch` at
+    # all (any value — real place name or gibberish — returns the same fixed
+    # 10 postings), silently hiding real matches (including, concretely, a
+    # "Vice President, Global Medical Safety" role in Copenhagen). Pinning
+    # `locale=en_GB` — the locale Novo Nordisk's and LEO Pharma's own pages
+    # already default to — fixes it, and is a no-op for tenants where it was
+    # already the effective default.
+    params = {"locale": "en_GB"}
+    if location_filter:
+        params["locationsearch"] = location_filter
+    postings = _fetch_pages(name, root, session, params)
+
+    if location_filter and postings:
+        # Confirmed on Lundbeck: `locationsearch` is accepted but silently
+        # ignored on some tenants — passing "Denmark", "Copenhagen", or even
+        # a nonsense string like "Mars" all return the exact same fixed 10
+        # results (real postings, just not filtered at all). Rather than
+        # trust that the param worked, verify at least one returned posting
+        # is actually in the requested place; if none are, the "filter" was
+        # a no-op, so fetch everything and filter client-side instead.
+        if not any(_location_matches(p.location, location_filter) for p in postings):
+            postings = [p for p in _fetch_pages(name, root, session, {"locale": "en_GB"})
+                        if _location_matches(p.location, location_filter)]
 
     return postings

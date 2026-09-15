@@ -45,8 +45,8 @@
     },
     {
       "name": "Genmab",
-      "start_url": "https://genmab.wd3.myworkdayjobs.com/Genmab_Careers_Site",
-      "engine": "workday",
+      "start_url": "https://careers.genmab.com/global/en/search-results",
+      "engine": "phenom",
       "location_filter": "Denmark"
     },
     {
@@ -90,6 +90,50 @@
       "start_url": "https://pharmacosmos.com/career/job-openings/",
       "engine": "pharmacosmos",
       "location_filter": "Denmark"
+    },
+    {
+      "name": "Coloplast",
+      "start_url": "https://careers.coloplast.com/search/",
+      "engine": "sf_j2w",
+      "location_filter": "Denmark"
+    },
+    {
+      "name": "Novonesis",
+      "start_url": "https://novozymes.wd103.myworkdayjobs.com/en-US/Novonesis_Careers",
+      "engine": "workday",
+      "location_filter": "Denmark"
+    },
+    {
+      "name": "AGC Biologics",
+      "start_url": "https://agcbio.wd5.myworkdayjobs.com/en-US/agcbio_careers",
+      "engine": "workday",
+      "location_filter": "Denmark"
+    },
+    {
+      "name": "FUJIFILM Diosynth Biotechnologies",
+      "start_url": "https://fujifilmdiosynth.wd3.myworkdayjobs.com/External",
+      "engine": "workday",
+      "location_filter": "Denmark"
+    },
+    {
+      "name": "GN (GN Hearing / GN Audio)",
+      "start_url": "https://gn.wd3.myworkdayjobs.com/GN-Careers",
+      "engine": "workday",
+      "location_filter": "Denmark"
+    },
+    {
+      "name": "Radiometer (Danaher)",
+      "_note": "jobs.danaher.com is a shared career site across Danaher's operating companies, not Radiometer-specific — no server-side filter for that was found, so a handful of postings here may be other Danaher brands (Cytiva, Danaher Corp itself) with a Danish presence rather than Radiometer. The Category column shows each posting's actual operating company (phenom.py's 'opco' field) so these are easy to tell apart on the dashboard.",
+      "start_url": "https://jobs.danaher.com/global/en/search-results",
+      "engine": "phenom",
+      "location_filter": "Denmark"
+    },
+    {
+      "name": "Black Swans Exist",
+      "_note": "A life-science recruitment agency (Denmark & Germany mandates), not an employer's own site — postings are for their clients, often anonymised. The real client/employer, when named, shows up in the Category column instead of here (see black_swan.py).",
+      "start_url": "https://blackswansexist.com/job-openings",
+      "engine": "black_swan",
+      "location_filter": "Denmark"
     }
   ],
   "_unsupported": [
@@ -97,6 +141,46 @@
       "name": "ALK-Abelló",
       "start_url": "https://alkabello.easycruit.com/",
       "reason": "EasyCruit career site sits behind an AWS WAF JS challenge (x-amzn-waf-action: challenge on every plain request) — not scrapable without a real browser, which this tool intentionally doesn't do. Revisit if ALK moves ATS platforms."
+    },
+    {
+      "name": "Syneos Health",
+      "start_url": "https://commercialcareers.syneoshealth.com/jobs/search",
+      "reason": "Cloudflare 'Attention Required' bot-challenge on every plain request — same category of block as ALK's, not scrapable without a real browser."
+    },
+    {
+      "name": "Demant",
+      "start_url": "https://careers.demant.com/",
+      "reason": "Runs a third variant of the SAP SuccessFactors Jobs2Web platform — a tile/AJAX-paginated layout (apiEndpoint 'tile-search-results'), not the server-rendered <table id=\"searchresults\"> layout sf_j2w.py parses (confirmed used by Novo Nordisk, Lundbeck, LEO Pharma, Coloplast). Not bot-blocked, just needs a new engine variant — nobody's built it yet."
+    },
+    {
+      "name": "Xellia Pharmaceuticals",
+      "start_url": "https://www.xellia.com/careers",
+      "reason": "No recognized ATS platform found (not Workday/SF/Phenom/Attrax/Jibe/Workable) and only ~4-10 open roles globally at any time — low value for the engineering effort of a bespoke scraper. Revisit if that changes."
+    },
+    {
+      "name": "Evaxion Biotech",
+      "start_url": "https://evaxion.ai/careers/",
+      "reason": "No recognized ATS platform found; ~50 employees total, very few open roles at any time. Low value for a bespoke scraper."
+    },
+    {
+      "name": "Saniona",
+      "start_url": "https://saniona.com/careers/",
+      "reason": "No recognized ATS platform found; had 0 open positions when checked. Low value for a bespoke scraper."
+    },
+    {
+      "name": "SNIPR Biome",
+      "start_url": "https://www.sniprbiome.com/careers-overview",
+      "reason": "No recognized ATS platform found; ~42 employees total, had 0 open positions when checked. Low value for a bespoke scraper."
+    },
+    {
+      "name": "MedWatch.dk",
+      "start_url": "https://medwatch.dk/Jobs",
+      "reason": "This is a Danish pharma/life-science trade publication's sponsored job board (would have been an aggregator source, not an employer's own site) — but its robots.txt explicitly disallows the 'Claude-User' agent ('Anthropic - user-initiated fetches in Claude') site-wide. That's exactly what this tool acting on the user's behalf is, so it's not fetched regardless of what literal User-Agent header this tool sends — spoofing a different one to route around a rule that targets Claude by identity would be exactly the kind of evasion this tool's own README commits it not to do. Revisit only if MedWatch changes that policy."
+    },
+    {
+      "name": "Jobindex.dk",
+      "start_url": "https://www.jobindex.dk/jobsoegning.rss",
+      "reason": "Denmark's largest general job board (would have been an aggregator source, not an employer's own site). Its robots.txt explicitly disallows '/jobsoegning*subid=', which rules out the only precise way to scope results to a pharma/biotech-relevant category (its RSS feed's `subid` param). The allowed alternative — free-text `q=<keyword>` search — was tested with several pharma/biotech terms and returned too much off-topic noise to be usable (e.g. \"pharma\" matched a district-heating company's facility job, \"life science\" matched kindergarten pedagogue postings), apparently due to fuzzy/stemmed full-text matching rather than a title/category match. Revisit if Jobindex exposes a more precise, robots.txt-allowed way to filter by industry."
     }
   ]
 }

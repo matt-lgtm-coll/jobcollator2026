@@ -36,6 +36,16 @@ def detect(url: str, session=None):
     except requests.RequestException:
         pass
 
+    # Try the Phenom People fingerprint: a server-rendered /global/en/search-results
+    # page with an `eagerLoadRefineSearch` JSON blob embedded in it.
+    phenom_url = f"{parsed.scheme}://{parsed.netloc}/global/en/search-results"
+    try:
+        resp = session.get(phenom_url, timeout=TIMEOUT)
+        if resp.status_code == 200 and "eagerLoadRefineSearch" in resp.text:
+            return "phenom", phenom_url
+    except requests.RequestException:
+        pass
+
     # Try the URL as given: Attrax (server-rendered `attrax-vacancy-tile`
     # cards) and Jibe/iCIMS (a JSON `/api/jobs` behind a JS-rendered page,
     # but its markup still references jibecdn/icims) both fingerprint off
