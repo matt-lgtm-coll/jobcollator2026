@@ -30,6 +30,12 @@ jobs:
       - run: pip install -r requirements.txt
 
       - name: Run collector
+        # collect.py exits 1 whenever any single company's fetch fails
+        # (e.g. an ATS endpoint returning an error) — that's surfaced as a
+        # warning banner on the report itself, not something that should
+        # block the commit/Pages steps below for every other company that
+        # succeeded.
+        continue-on-error: true
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
