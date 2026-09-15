@@ -134,6 +134,12 @@
       "start_url": "https://blackswansexist.com/job-openings",
       "engine": "black_swan",
       "location_filter": "Denmark"
+    },
+    {
+      "name": "Gubra",
+      "start_url": "https://career.gubra.dk/available-positions",
+      "engine": "emply",
+      "location_filter": "Denmark"
     }
   ],
   "_unsupported": [
@@ -181,6 +187,27 @@
       "name": "Jobindex.dk",
       "start_url": "https://www.jobindex.dk/jobsoegning.rss",
       "reason": "Denmark's largest general job board (would have been an aggregator source, not an employer's own site). Its robots.txt explicitly disallows '/jobsoegning*subid=', which rules out the only precise way to scope results to a pharma/biotech-relevant category (its RSS feed's `subid` param). The allowed alternative — free-text `q=<keyword>` search — was tested with several pharma/biotech terms and returned too much off-topic noise to be usable (e.g. \"pharma\" matched a district-heating company's facility job, \"life science\" matched kindergarten pedagogue postings), apparently due to fuzzy/stemmed full-text matching rather than a title/category match. Revisit if Jobindex exposes a more precise, robots.txt-allowed way to filter by industry."
+    },
+    {
+      "name": "Danish Medicines Agency (Lægemiddelstyrelsen)",
+      "start_url": "https://candidate.hr-manager.net/Agent/Subscription.aspx?customer=statens_erekruttering&departmentId=6016",
+      "reason": "All vacancies run through HR-Manager, the shared Danish state recruitment platform (candidate.hr-manager.net), whose robots.txt disallows crawling almost everything ('Disallow: /' with one narrow exception unrelated to listings) — same category of block as ALK-Abelló/Syneos, not scrapable without a real browser."
+    },
+    {
+      "name": "Nordic Bioscience",
+      "start_url": "https://www.nordicbioscience.com/about/career/",
+      "reason": "Embeds an iframe from candidate.hr-manager.net (customer=nordicbioscience_tr) — the same HR-Manager platform as the Danish Medicines Agency, blocked by the same broad robots.txt disallow."
+    },
+    {
+      "name": "Ambu",
+      "start_url": "https://jobs.ambu.com/search?searchResultView=LIST",
+      "reason": "Runs the newer React-based 'Unify' variant of SAP SuccessFactors Jobs2Web (same underlying platform family as Novo Nordisk/Coloplast, but not the server-rendered <table id=\"searchresults\"> layout sf_j2w.py parses) — same unsupported variant as Demant. Its data comes from a clean JSON API (POST /services/recruiting/v1/jobs, body {\"locale\":\"en_GB\"}), confirmed working and not robots.txt-blocked, but its pagination parameters weren't pinned down (totalJobs is 101; the default page returns ~10 non-deterministically-ordered results with no confirmed offset param) — needs more work to enumerate the full listing reliably before it's worth wiring up a 'j2w_unify' engine. Fixing this would likely also unblock Demant.",
+      "_engine_notes": "Confirmed working: POST https://jobs.ambu.com/services/recruiting/v1/jobs with JSON body {\"locale\":\"en_GB\"} returns {jobSearchResult: [...], totalJobs: N}. Each item's `response` has jobLocationCountry, unifiedStandardTitle, unifiedUrlTitle, id, city, unifiedStandardStart. Job detail URL pattern not yet confirmed. Next step: find the real pagination param (tried pageNum/pageSize, start/num — neither changed the page deterministically) by reading the minified j2w.searchResultsUnify.min.js / reactWidgetLoader.js bundles rather than guessing."
+    },
+    {
+      "name": "Fertin Pharma",
+      "start_url": "https://www.fertin.com/career",
+      "reason": "Uses two different systems for different job categories: Salesforce Sites (aspeya.my.salesforce-sites.com/Recruit/fRecruit__ApplyJob) for most roles, and a separate 'Job Match Profile' portal (app.jobmatchprofile.com) for production-shift roles specifically. Neither is a platform this tool has an engine for yet, and the Salesforce Sites recruiting app in particular is an obscure enough platform (not seen elsewhere in this list) that it wasn't investigated further given the split-system complexity. Revisit if it turns out to matter enough to justify a bespoke two-source engine."
     }
   ]
 }
