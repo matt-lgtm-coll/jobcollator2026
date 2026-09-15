@@ -1,0 +1,66 @@
+name: Collect job postings
+
+on:
+  schedule:
+    # 06:06 UTC ≈ 08:06 Europe/Copenhagen in summer (CEST, UTC+2),
+    # ≈ 07:06 local in winter (CET, UTC+1) — GitHub Actions cron is
+    # UTC-only, so the local time drifts ~1h across the DST changeovers.
+    - cron: "6 6 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install -r requirements.txt
+
+      - name: Run collector
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python -m jobcollator.collect
+
+      - name: Commit updated job data
+        run: |
+          git config user.name "job-collator-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/jobs.db companies.json
+          git diff --quiet --cached || git commit -m "Automated data update $(date -u +%Y-%m-%d)"
+          git push
+
+      - name: Prepare dashboard for Pages
+        run: |
+          mkdir -p public
+          cp data/report.html public/index.html
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+  deploy:
+    needs: collect
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

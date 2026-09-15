@@ -11,7 +11,7 @@ import time
 from datetime import date, datetime
 from pathlib import Path
 
-from . import db, report, tagging
+from . import db, notify_telegram, report, tagging
 from .detect import detect
 from .engines import ENGINES
 from .engines.base import FetchError
@@ -20,6 +20,7 @@ from .http import new_session
 DEFAULT_COMPANIES_PATH = Path(__file__).resolve().parent.parent / "companies.json"
 REPORT_PATH = Path(__file__).resolve().parent.parent / "data" / "report.html"
 SUMMARY_PATH = Path(__file__).resolve().parent.parent / "data" / "last_run_summary.json"
+ARTIFACT_URL_PATH = Path(__file__).resolve().parent.parent / ".artifact_url"
 
 
 def load_companies(path: Path):
@@ -132,6 +133,11 @@ def main(argv=None):
     SUMMARY_PATH.parent.mkdir(parents=True, exist_ok=True)
     SUMMARY_PATH.write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"Summary written to {SUMMARY_PATH} ({summary['new_count']} new)")
+
+    dashboard_url = None
+    if ARTIFACT_URL_PATH.exists():
+        dashboard_url = ARTIFACT_URL_PATH.read_text(encoding="utf-8").strip() or None
+    notify_telegram.notify(summary, dashboard_url)
 
     conn.close()
     return exit_code
