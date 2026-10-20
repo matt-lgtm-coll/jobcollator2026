@@ -143,15 +143,32 @@ def set_jd_text(conn, company, external_id, text):
     conn.commit()
 
 
+def first_look_companies(conn, run_date):
+    """Companies whose first successful run is `run_date` itself. Everything
+    they list that day is "first seen" simply because the tracker has never
+    looked there before, not because it was posted — so it is a baseline,
+    not news, and is excluded from new-job counts and notifications."""
+    cur = conn.execute(
+        "SELECT DISTINCT company FROM runs WHERE status='ok' AND run_date=? "
+        "AND company NOT IN (SELECT company FROM runs WHERE status='ok' AND run_date<?)",
+        (run_date, run_date),
+    )
+    return {row[0] for row in cur.fetchall()}
+
+
 def new_since(conn, run_date):
     """Confirmed active postings first seen on `run_date` — i.e. new in the
-    most recent run. Excludes soft matches (see JobPosting.soft_match):
-    those are a hint, not a confirmed opening, so they don't drive the "new"
-    count/list a push notification would otherwise treat as reliable."""
+    most recent run — at companies the tracker had already looked at before
+    (see first_look_companies). Excludes soft matches (see
+    JobPosting.soft_match): those are a hint, not a confirmed opening, so
+    they don't drive the "new" count/list a push notification would
+    otherwise treat as reliable."""
     cur = conn.execute(
         "SELECT company, title, location, url FROM jobs "
-        "WHERE active=1 AND first_seen=? AND soft_match=0 ORDER BY company, title",
-        (run_date,),
+        "WHERE active=1 AND first_seen=? AND soft_match=0 "
+        "AND company IN (SELECT company FROM runs WHERE status='ok' AND run_date<?) "
+        "ORDER BY company, title",
+        (run_date, run_date),
     )
     cols = [d[0] for d in cur.description]
     return [dict(zip(cols, row)) for row in cur.fetchall()]

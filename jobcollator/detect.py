@@ -26,6 +26,12 @@ def detect(url: str, session=None):
     if "apply.workable.com" in parsed.netloc:
         return "workable", url
 
+    # Eightfold needs the tenant's `domain` param, which can't be guessed from
+    # the hostname, so only the engine name is detected here; add
+    # ?domain=<tenant domain> to the start_url by hand (see eightfold.py).
+    if parsed.netloc.endswith(".eightfold.ai"):
+        return "eightfold", url
+
     # Try the SuccessFactors Jobs2Web fingerprint: a server-rendered
     # /search/ page with a #searchresults table.
     search_url = f"{parsed.scheme}://{parsed.netloc}/search/"
@@ -61,6 +67,8 @@ def detect(url: str, session=None):
                 return "jibe", url
             if "hitalento-career-theme" in lower:
                 return "hitalento", url
+            if "teamtailor-cdn.com" in lower:
+                return "teamtailor", url
     except requests.RequestException:
         pass
 

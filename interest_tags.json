@@ -10,7 +10,9 @@
         "heart failure", "coronary", "arrhythmia", "atrial fibrillation",
         "echocardiogra", "electrophysiology", "atherosclerosis",
         "cardiometabolic", "metabolic syndrome", "type 2 diabetes",
-        "diabetes", "obesity", "dyslipidemia", "hypertension", "NASH", "MASH"
+        "diabetes", "obesity", "dyslipidemia", "hypertension", "NASH", "MASH", "CVRM",
+        "kardiolog", "kardiovaskul", "hjärtsvikt", "hjärt-kärl", "hjärtkärl",
+        "kranskärl", "förmaksflimmer", "fetma", "hypertoni"
       ]
     }
   ]

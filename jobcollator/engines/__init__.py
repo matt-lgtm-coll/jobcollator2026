@@ -1,4 +1,7 @@
-from . import attrax, black_swan, emply, hitalento, jibe, pharmacosmos, phenom, sf_j2w, workable, workday
+from . import (
+    attrax, black_swan, bondi, brice, eightfold, emply, hitalento, jibe, moveup,
+    peaksearch, pharmacosmos, phenom, sf_j2w, teamtailor, workable, workday,
+)
 
 ENGINES = {
     "sf_j2w": sf_j2w,
@@ -11,4 +14,10 @@ ENGINES = {
     "phenom": phenom,
     "black_swan": black_swan,
     "emply": emply,
+    "teamtailor": teamtailor,
+    "eightfold": eightfold,
+    "brice": brice,
+    "moveup": moveup,
+    "peaksearch": peaksearch,
+    "bondi": bondi,
 }

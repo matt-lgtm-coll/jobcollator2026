@@ -140,6 +140,55 @@
       "start_url": "https://career.gubra.dk/available-positions",
       "engine": "emply",
       "location_filter": "Denmark"
+    },
+    {
+      "name": "AstraZeneca (Gothenburg)",
+      "_note": "Eightfold's `location` param is a fuzzy geo match, so eightfold.py re-checks every result client-side. 'Gothenburg' is aliased to AstraZeneca's Mölndal site. Set location_filter to 'Sweden' to also see Stockholm/Södertälje.",
+      "start_url": "https://astrazeneca.eightfold.ai/careers?domain=astrazeneca.com",
+      "engine": "eightfold",
+      "location_filter": "Gothenburg"
+    },
+    {
+      "name": "TFS HealthScience",
+      "_note": "Teamtailor RSS. Matches if any of a posting's locations is in Sweden; other countries are shown as '(also ...)'. TFS also has ~2 Denmark-tagged postings if you ever want a second entry with location_filter 'Denmark'.",
+      "start_url": "https://careers.tfscro.com/jobs",
+      "engine": "teamtailor",
+      "location_filter": "Sweden"
+    },
+    {
+      "name": "Haeger & Carlsson",
+      "_note": "Executive-search/interim recruiter (Sweden & Norway), not an employer's own site; postings are for its clients. Teamtailor RSS.",
+      "start_url": "https://careers.haegercarlsson.com/jobs",
+      "engine": "teamtailor",
+      "location_filter": "Sweden"
+    },
+    {
+      "name": "Brice",
+      "_note": "Swedish life-science/medtech recruiter (not an employer's own site). Locations are regions, not countries, so there is no location filter: the whole board is tracked.",
+      "start_url": "https://www.brice.se/lediga-jobb/",
+      "engine": "brice",
+      "location_filter": null
+    },
+    {
+      "name": "Moveup",
+      "_note": "Swedish life-science/medtech recruiter (not an employer's own site). Free-text locations (occasionally Oslo/Denmark), so no location filter: the whole live board is tracked.",
+      "start_url": "https://www.moveup.se/lediga-jobb/",
+      "engine": "moveup",
+      "location_filter": null
+    },
+    {
+      "name": "PeakSearch",
+      "_note": "Swedish life-science recruiter (not an employer's own site). Postings carry no location or date. Filled 'TILLSATT' mandates are skipped.",
+      "start_url": "https://peaksearch.se/rekryteringsuppdrag/",
+      "engine": "peaksearch",
+      "location_filter": null
+    },
+    {
+      "name": "Bondi Executive Search",
+      "_note": "Swedish executive-search recruiter (not an employer's own site). Board covers all sectors (currently includes a real-estate mandate) with no location, category or date fields.",
+      "start_url": "https://www.bondi.se/sv/publika-uppdrag",
+      "engine": "bondi",
+      "location_filter": null
     }
   ],
   "_unsupported": [

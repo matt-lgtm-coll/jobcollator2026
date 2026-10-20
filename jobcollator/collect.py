@@ -48,6 +48,8 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--companies", type=Path, default=DEFAULT_COMPANIES_PATH)
     parser.add_argument("--report", type=Path, default=REPORT_PATH)
+    parser.add_argument("--no-notify", action="store_true",
+                        help="skip the Telegram notification (e.g. for manual dashboard refreshes)")
     args = parser.parse_args(argv)
 
     companies = load_companies(args.companies)
@@ -122,6 +124,7 @@ def main(argv=None):
     print(f"\nReport written to {out_path}")
 
     new_jobs = db.new_since(conn, run_date)
+    first_look = db.first_look_companies(conn, run_date)
     summary = {
         "run_date": run_date,
         "generated_at": datetime.now().isoformat(timespec="seconds"),
@@ -129,6 +132,7 @@ def main(argv=None):
         "new_count": len(new_jobs),
         "new_jobs": new_jobs,
         "failed_companies": failed_companies,
+        "first_look_companies": sorted(first_look),
     }
     SUMMARY_PATH.parent.mkdir(parents=True, exist_ok=True)
     SUMMARY_PATH.write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -137,7 +141,12 @@ def main(argv=None):
     dashboard_url = None
     if ARTIFACT_URL_PATH.exists():
         dashboard_url = ARTIFACT_URL_PATH.read_text(encoding="utf-8").strip() or None
-    notify_telegram.notify(summary, dashboard_url)
+    if first_look:
+        print(f"First look (baseline, not counted as new): {', '.join(sorted(first_look))}")
+    if args.no_notify:
+        print("[notify_telegram] skipped (--no-notify)")
+    else:
+        notify_telegram.notify(summary, dashboard_url)
 
     conn.close()
     return exit_code

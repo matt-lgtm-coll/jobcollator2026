@@ -54,7 +54,12 @@ def generate(conn, out_path: Path = DEFAULT_OUT, tracked_companies=None, unsuppo
     # opening, so they're excluded from the headline counts the same way
     # db.new_since() already excludes them from the "new" list — shown in
     # the table below with their own badge instead, not folded in here.
-    new_count = sum(1 for j in confirmed_jobs if j["first_seen"] == run_date)
+    # A company the tracker is looking at for the first time has everything
+    # "first seen" today by definition — a baseline, not news (see
+    # db.first_look_companies) — so it gets no NEW badge or headline count.
+    first_look = db.first_look_companies(conn, run_date)
+    new_count = sum(1 for j in confirmed_jobs
+                    if j["first_seen"] == run_date and j["company"] not in first_look)
 
     tags_config = tagging.load_tags()
     payload = [{
@@ -64,7 +69,7 @@ def generate(conn, out_path: Path = DEFAULT_OUT, tracked_companies=None, unsuppo
         "category": j["category"] or "—",
         "url": j["url"],
         "posted": j["posted_date"] or "",
-        "isNew": (not j["soft_match"]) and j["first_seen"] == run_date,
+        "isNew": (not j["soft_match"]) and j["first_seen"] == run_date and j["company"] not in first_look,
         "isSoftMatch": bool(j["soft_match"]),
         "tags": [t["id"] for t in tagging.match_tags(j["title"], j["category"] or "", tags_config, j["jd_text"] or "")],
     } for j in jobs]

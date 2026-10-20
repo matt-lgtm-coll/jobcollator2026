@@ -25,6 +25,7 @@ from urllib import error, parse, request
 CONFIG_PATH = Path(__file__).resolve().parent.parent / "telegram_config.json"
 API_URL = "https://api.telegram.org/bot{token}/sendMessage"
 
+DIGEST_THRESHOLD = 25  # more new jobs than this -> one per-company count message instead of the full list
 MESSAGE_LIMIT = 4000  # Telegram's hard cap is 4096 chars; leave headroom for the "(Part i/n)" prefix
 SEND_DELAY_SECONDS = 0.3  # be polite between multi-part messages
 
@@ -41,12 +42,31 @@ def _load_config():
         return json.load(f)
 
 
+def _digest(summary: dict, dashboard_url: str | None) -> str:
+    """One short message of per-company counts, for runs with too many new
+    jobs to list individually."""
+    n = summary["new_count"]
+    counts: dict[str, int] = {}
+    for job in summary["new_jobs"]:
+        counts[job["company"]] = counts.get(job["company"], 0) + 1
+    lines = [f"<b>{n} new job postings</b> in the tracker — too many to list:", ""]
+    for company, c in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])):
+        lines.append(f"• {html.escape(company)}: {c}")
+    if dashboard_url:
+        lines += ["", f'<a href="{html.escape(dashboard_url, quote=True)}">Full dashboard</a>']
+    return "\n".join(lines)[:MESSAGE_LIMIT]
+
+
 def build_messages(summary: dict, dashboard_url: str | None) -> list[str]:
     """Return one or more HTML-formatted message bodies covering every new
     job — split across multiple messages rather than truncating the list,
-    since Telegram caps a single message at 4096 characters."""
+    since Telegram caps a single message at 4096 characters. Above
+    DIGEST_THRESHOLD new jobs the list itself becomes noise, so a single
+    per-company digest is sent instead."""
     n = summary["new_count"]
-    header = f"<b>{n} new job posting{'s' if n != 1 else ''}</b> in the Danish tracker"
+    if n > DIGEST_THRESHOLD:
+        return [_digest(summary, dashboard_url)]
+    header = f"<b>{n} new job posting{'s' if n != 1 else ''}</b> in the tracker"
 
     job_lines = []
     for job in summary["new_jobs"]:

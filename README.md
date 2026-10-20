@@ -23,8 +23,56 @@ just points at the engine it needs:
 | `hitalento`    | HiTalento WordPress career theme                           | Hemab                                                                  |
 | `pharmacosmos` | Pharmacosmos's own career page                             | Pharmacosmos                                                           |
 | `black_swan`   | WP Job Manager (WordPress career-board plugin)             | Black Swans Exist (a life-science recruitment agency — see below)      |
+| `teamtailor`   | Teamtailor career sites, via their public `/jobs.rss` feed | TFS HealthScience, Haeger & Carlsson (recruiter)                       |
+| `eightfold`    | Eightfold AI `pcsx` search API                             | AstraZeneca (Gothenburg)                                               |
+| `brice`, `moveup`, `peaksearch`, `bondi` | One bespoke engine per Swedish recruiter's mandate board | Brice, Moveup, PeakSearch, Bondi Executive Search (recruiters) |
 
 All engines only hit URLs allowed by the site's `robots.txt`.
+
+### Swedish sources (AstraZeneca, TFS, and four recruiters)
+
+Added together; the findings that shaped each engine, so they don't need
+re-deriving:
+
+* **Eightfold's `location=` param is a fuzzy geographic match — never trust
+  it** (the "verify, don't trust" rule again). Querying `Gothenburg` returned
+  AstraZeneca's 10 Mölndal roles but also a Stockholm "Strategic Account
+  Manager" role. `eightfold.py` re-checks every returned position client-side
+  against the filter. AstraZeneca's Gothenburg site is registered under the
+  municipality **Mölndal**, so `Gothenburg` is aliased to
+  `gothenburg / göteborg / mölndal`; the alias list is the one thing to extend
+  for another city. Results come 10 per page regardless of `num=`. Set the
+  company's `location_filter` to `Sweden` to also get Stockholm/Södertälje
+  (29 roles at the time of writing, 17 of them in Södertälje).
+  `start_url` must carry `?domain=astrazeneca.com`: the tenant domain can't be
+  derived from the hostname. Job descriptions come from
+  `/api/pcsx/position_details`, since the `/careers/job/ID` page is a JS shell.
+* **Teamtailor's RSS feed is the integration surface to use**, not the HTML.
+  TFS's `/jobs` page has *no* job links in its raw HTML, while the feed has
+  all 38 roles; for Haeger & Carlsson the feed and HTML carried the identical
+  18 ids. Each posting lists several `tt:location`s; the filter matches if
+  *any* is in the wanted country/city and the other countries are shown as
+  "(also Spain, Poland)", because a role open in Gothenburg *and* Warszawa is
+  worth seeing (same reasoning as `soft_match`). TFS also has a couple of
+  Denmark-tagged roles — add a second company entry with
+  `location_filter: "Denmark"` if wanted.
+* **Moveup: don't list the WordPress REST API.** `wp-json/wp/v2/jobb` holds
+  every mandate they have ever posted (548 and growing, back to 2024), so
+  treating it as "open jobs" would report hundreds of filled roles. The live
+  `/lediga-jobb/` listing (~15 roles, all marked "Pågående") is the authority;
+  the REST API is used only to add dates and categories to those slugs.
+* **PeakSearch keeps filled mandates on the page**, prefixed `TILLSATT`
+  ("filled"): 10 of its 15 cards when added. They are skipped.
+* **Recruiter boards have no usable location field** (Swedish regions, "The
+  Nordics", sometimes Oslo or Denmark; PeakSearch and Bondi have none at all),
+  so their `location_filter` is `null` and the whole board is tracked.
+  Bondi's board spans all sectors (it includes a real-estate franchise
+  mandate) with nothing to filter on. None of the four carries a posting date
+  except Moveup, so the Posted column is "—" for the rest.
+* The cardiometabolic tag now includes Swedish terms (`kardiolog`,
+  `hjärtsvikt`, `fetma`, ...) because these boards write in Swedish, and
+  `CVRM` (AstraZeneca's own abbreviation for Cardiovascular, Renal &
+  Metabolism).
 
 **Aggregators/recruiters vs. employers' own sites:** `black_swan` is the one
 engine here that isn't an employer's own career site — Black Swans Exist is a
@@ -355,6 +403,26 @@ scratch.
    support yet. Common ones worth adding as a new engine in
    `jobcollator/engines/`: Greenhouse, Lever, SmartRecruiters, Teamtailor —
    all have simple public JSON APIs similar in spirit to `workday.py`.
+
+## Telegram notifications
+
+`collect.py` sends a Telegram message (`notify_telegram.py`; credentials from
+`TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` or the git-ignored
+`telegram_config.json`) whenever a run finds new postings. Three things keep
+it from flooding the chat:
+
+* **First look = baseline, not news.** A company the tracker has never
+  successfully run against before (`db.first_look_companies`) has every open
+  role "first seen" that day just because it's new to the tracker. Those are
+  left out of the new count, the NEW badges, and the notification; they count
+  as new from the next run onward. Adding a new source therefore no longer
+  announces its whole board.
+* **Digest above 25.** More than `DIGEST_THRESHOLD` new roles in one run
+  (e.g. after a long gap) sends one per-company count message instead of the
+  full list.
+* **`--no-notify`** (`python -m jobcollator.collect --no-notify`) for manual
+  dashboard refreshes. Note that a same-day re-run without it re-sends the
+  same new roles.
 
 ## Usage
 
