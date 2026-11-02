@@ -2,10 +2,14 @@ name: Collect job postings
 
 on:
   schedule:
-    # 05:23 UTC (06:23 Copenhagen in winter, 07:23 in summer). GitHub
-    # often starts scheduled runs hours late, especially on the hour, so
-    # this runs early and off the hour to land by late morning.
+    # GitHub runs scheduled workflows on a best-effort basis: starts are
+    # often hours late, and now and then a day is skipped entirely.
+    # Main run: 05:23 UTC (06:23 Copenhagen in winter, 07:23 in summer),
+    # early and off the hour so even a long delay lands by late morning.
     - cron: "23 5 * * *"
+    # Backup at 12:47 UTC. Either scheduled run is skipped if a run has
+    # already succeeded today (UTC); see the gate job.
+    - cron: "47 12 * * *"
   workflow_dispatch: {}
 
 permissions:
@@ -16,7 +20,39 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  gate:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+    outputs:
+      run: ${{ steps.check.outputs.run }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Manual runs always go ahead; a scheduled run is skipped if
+          # another run (either schedule, or a manual one) already
+          # succeeded today, so a late main run and the backup never
+          # both do the work.
+          if [ "${{ github.event_name }}" != "schedule" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          today=$(date -u +%Y-%m-%d)
+          done_today=$(gh api "repos/${{ github.repository }}/actions/workflows/collect.yml/runs?status=success&created=>=${today}" \
+            --jq "[.workflow_runs[] | select(.id != ${{ github.run_id }})] | length" || echo 0)
+          if [ "$done_today" -gt 0 ]; then
+            echo "Already ran successfully today; skipping."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "No successful run yet today; collecting."
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
   collect:
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
