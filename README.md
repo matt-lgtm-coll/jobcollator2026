@@ -408,8 +408,9 @@ scratch.
 
 `collect.py` sends a Telegram message (`notify_telegram.py`; credentials from
 `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` or the git-ignored
-`telegram_config.json`) whenever a run finds new postings. Three things keep
-it from flooding the chat:
+`telegram_config.json`) whenever a run finds new postings. Two things keep
+it from flooding the chat (a long list is always sent in full, split across
+several messages under Telegram's 4096-character limit):
 
 * **First look = baseline, not news.** A company the tracker has never
   successfully run against before (`db.first_look_companies`) has every open
@@ -417,12 +418,13 @@ it from flooding the chat:
   left out of the new count, the NEW badges, and the notification; they count
   as new from the next run onward. Adding a new source therefore no longer
   announces its whole board.
-* **Digest above 25.** More than `DIGEST_THRESHOLD` new roles in one run
-  (e.g. after a long gap) sends one per-company count message instead of the
-  full list.
 * **`--no-notify`** (`python -m jobcollator.collect --no-notify`) for manual
   dashboard refreshes. Note that a same-day re-run without it re-sends the
   same new roles.
+
+To re-send a past day's list without collecting again, run the
+"Re-send Telegram notification" workflow from the Actions tab (optional date
+input, default today), or locally `python -m jobcollator.resend --date YYYY-MM-DD`.
 
 ## Usage
 

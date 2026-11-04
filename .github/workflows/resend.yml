@@ -1,0 +1,38 @@
+name: Re-send Telegram notification
+
+# Manually re-send the Telegram list of new jobs for a past run date,
+# without collecting again.
+on:
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "Run date to re-send (YYYY-MM-DD, UTC). Empty = today."
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  resend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install -r requirements.txt
+
+      - name: Re-send notification
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          RESEND_DATE: ${{ inputs.date }}
+        run: |
+          if [ -n "$RESEND_DATE" ]; then
+            python -m jobcollator.resend --date "$RESEND_DATE"
+          else
+            python -m jobcollator.resend
+          fi
